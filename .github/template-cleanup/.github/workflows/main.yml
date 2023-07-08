@@ -1,0 +1,121 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - src/**
+      - static/**
+      - package.json
+      - pnpm-lock.yaml
+      - "*.config.*s"
+      - tsconfig.json
+      - .github/workflows/*
+  pull_request:
+    paths:
+      - src/**
+      - static/**
+      - package.json
+      - pnpm-lock.yaml
+      - "*.config.*s"
+      - tsconfig.json
+      - .github/workflows/*
+
+# Allow one concurrent deployment
+concurrency:
+  group: main
+  cancel-in-progress: true
+
+# Start the workflow
+jobs:
+  prechecks:
+    name: Pre-checks
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    
+    steps:
+      - name: 📂 Checkout
+        uses: actions/checkout@v3
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.head_ref }}
+      
+      - name: 📥 Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: latest
+
+      - name: 🧭 Setup Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: latest
+          cache: pnpm
+
+      - name: 📥 Install NPM dependencies
+        run: pnpm i --no-frozen-lockfile
+
+      - name: 📤 Commit updated lock file
+        id: auto-commit-action-lock
+        uses: stefanzweifel/git-auto-commit-action@v4
+        with:
+          commit_message: Update lock file
+          file_pattern: pnpm-lock.yaml
+
+      - name: ❌ Exit if changes detected
+        if: steps.auto-commit-action-lock.outputs.changes_detected == 'true'
+        run: exit 1
+
+      - name: ✨ Check Svelte format
+        run: pnpm check
+
+      - name: ✨ Check style with Prettier & ESLint
+        id: lint-check
+        run: pnpm ci:lint
+
+      - name: 🔧 Fix lint
+        if: failure() && steps.lint-check.conclusion == 'failure'
+        run: pnpm format
+
+      - name: 📤 Commit lint fixes
+        if: failure() && steps.lint-check.conclusion == 'failure'
+        uses: stefanzweifel/git-auto-commit-action@v4
+        with:
+          commit_message: Fix lint
+
+  build:
+    name: Build website
+    runs-on: ubuntu-latest
+    needs: prechecks
+    if: always() && !cancelled() && (needs.prechecks.result == 'success' || needs.prechecks.result == 'skipped')
+
+    steps:
+      - name: 📂 Checkout
+        uses: actions/checkout@v3
+        with:
+          repository: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name || github.repository }}
+          ref: ${{ github.head_ref }}
+
+      - name: 🔧 Configure pages
+        uses: actions/configure-pages@v3
+        if: github.event_name != 'pull_request'
+        id: pages
+        with:
+          static_site_generator: sveltekit
+
+      - name: 📥 Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: latest
+
+      - name: 🧭 Setup Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: latest
+          cache: pnpm
+
+      - name: 📥 Install NPM dependencies
+        run: pnpm i  # no need for `--no-frozen-lockfile` here, as the sync is ensured by the `prechecks` job
+
+      - name: 🔨 Build repo
+        run: pnpm build

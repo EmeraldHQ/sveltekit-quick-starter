@@ -1,0 +1,36 @@
+# Based on https://github.com/JetBrains/intellij-platform-plugin-template/blob/main/.github/workflows/template-cleanup.yml
+name: Template Cleanup
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  cleanup:
+    name: Cleanup
+    runs-on: ubuntu-latest
+    if: github.event.repository.name != 'sveltekit-quick-starter'
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Cleanup
+        run: |
+          # Replace Every %NAME% with the repository name
+          find . -type f -exec sed -i "s/%NAME%/${{ github.event.repository.name }}/g" {} +
+
+          # Move everything from .github/template-cleanup to the root
+          mv .github/template-cleanup/* .
+
+          # Remove the template cleanup workflow and the template-cleanup folder
+          rmdir .github/template-cleanup
+          rm .github/workflows/template-cleanup.yml
+      
+      - name: Commit and push changes
+        uses: stefanzweifel/git-auto-commit-action@v4
+        with:
+          commit_message: Template cleanup
