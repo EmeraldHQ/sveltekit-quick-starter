@@ -24,11 +24,11 @@ jobs:
           find . -type f -exec sed -i "s/%NAME%/${{ github.event.repository.name }}/g" {} +
 
           # Move everything from .github/template-cleanup to the root
-          mv .github/template-cleanup/* .
+          shopt -s dotglob
+          cp -R .github/template-cleanup/* .
 
           # Remove the template cleanup workflow and the template-cleanup folder
-          rmdir .github/template-cleanup
-          rm .github/workflows/template-cleanup.yml
+          rm -r .github/template-cleanup .github/workflows/template-cleanup.yml
       
       - name: Commit and push changes
         uses: stefanzweifel/git-auto-commit-action@v4
