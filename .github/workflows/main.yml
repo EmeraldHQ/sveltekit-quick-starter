@@ -96,13 +96,6 @@ jobs:
           repository: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name || github.repository }}
           ref: ${{ github.head_ref }}
 
-      - name: 🔧 Configure pages
-        uses: actions/configure-pages@v3
-        if: github.event_name != 'pull_request'
-        id: pages
-        with:
-          static_site_generator: sveltekit
-
       - name: 📥 Install pnpm
         uses: pnpm/action-setup@v2
         with:
