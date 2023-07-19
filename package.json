@@ -12,9 +12,9 @@
 		"deps:update-latest": "pnpm up -L",
 		"check": "svelte-kit sync && svelte-check",
 		"check:watch": "svelte-kit sync && svelte-check --watch",
-		"lint": "prettier --plugin-search-dir . --check . && eslint .",
-		"format": "prettier --plugin-search-dir . --write .",
-		"ci:lint": "prettier --plugin-search-dir . --check ./src && eslint ./src",
+		"lint": "prettier --check . && eslint .",
+		"format": "prettier --write .",
+		"ci:lint": "prettier --check ./src && eslint ./src",
 		"prepare": "husky install"
 	},
 	"devDependencies": {
@@ -28,8 +28,8 @@
 		"eslint-plugin-svelte": "^2.32.2",
 		"husky": "^8.0.3",
 		"postcss": "^8.4.26",
-		"prettier": "^2.8.8",
-		"prettier-plugin-svelte": "^2.10.1",
+		"prettier": "^3.0.0",
+		"prettier-plugin-svelte": "^3.0.0",
 		"prettier-plugin-tailwindcss": "^0.4.1",
 		"svelte": "^4.0.5",
 		"svelte-check": "^3.4.6",

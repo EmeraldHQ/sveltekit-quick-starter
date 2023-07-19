@@ -29,7 +29,7 @@ jobs:
 
           # Remove the template cleanup workflow and the template-cleanup folder
           rm -r .github/template-cleanup .github/workflows/template-cleanup.yml
-      
+
       - name: Commit and push changes
         uses: stefanzweifel/git-auto-commit-action@v4
         with:

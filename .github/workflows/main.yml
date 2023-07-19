@@ -35,14 +35,14 @@ jobs:
     if: github.event_name == 'pull_request'
     permissions:
       contents: write
-    
+
     steps:
       - name: 📂 Checkout
         uses: actions/checkout@v3
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name }}
           ref: ${{ github.head_ref }}
-      
+
       - name: 📥 Install pnpm
         uses: pnpm/action-setup@v2
         with:
@@ -110,7 +110,7 @@ jobs:
           cache: pnpm
 
       - name: 📥 Install NPM dependencies
-        run: pnpm i  # no need for `--no-frozen-lockfile` here, as the sync is ensured by the `prechecks` job
+        run: pnpm i # no need for `--no-frozen-lockfile` here, as the sync is ensured by the `prechecks` job
 
       - name: 🔨 Build repo
         run: pnpm build
