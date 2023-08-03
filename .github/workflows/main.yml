@@ -41,7 +41,7 @@ jobs:
     name: Pre-checks
     runs-on: ubuntu-latest
     needs: permissions-check
-    if: github.event_name == 'pull_request' && (success() || failure())
+    if: github.event_name == 'pull_request' && !cancelled()
     permissions:
       contents: write
 
