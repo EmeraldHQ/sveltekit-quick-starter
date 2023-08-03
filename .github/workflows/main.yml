@@ -113,7 +113,7 @@ jobs:
     name: Build website
     runs-on: ubuntu-latest
     needs: prechecks
-    if: success() || github.event_name == 'push'
+    if: (!failure() && !cancelled()) || github.event_name == 'push'
 
     steps:
       - name: 📂 Checkout
