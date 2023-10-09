@@ -83,7 +83,7 @@ jobs:
       - name: 📤 Commit updated lock file
         id: auto-commit-action-lock
         if: needs.permissions-check.result != 'failure'
-        uses: stefanzweifel/git-auto-commit-action@v4
+        uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: Update lock file
           file_pattern: pnpm-lock.yaml
@@ -105,7 +105,7 @@ jobs:
 
       - name: 📤 Commit lint fixes
         if: failure() && needs.permissions-check.result != 'failure'
-        uses: stefanzweifel/git-auto-commit-action@v4
+        uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: Fix lint
 
