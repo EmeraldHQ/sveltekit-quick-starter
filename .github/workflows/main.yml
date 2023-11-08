@@ -22,26 +22,39 @@ on:
       - tsconfig.json
       - .github/workflows/*
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 # Start the workflow
 jobs:
   permissions-check:
     name: Permissions check
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' && github.actor != 'dependabot[bot]'
+    if: github.event_name == 'pull_request'
+    outputs:
+      has-permissions: ${{ steps.check-output.outputs.has-permissions }}
 
     steps:
       - name: ❓ Has access to secrets?
+        id: secrets-check
+        continue-on-error: true
         uses: actions/checkout@v4
         with:
           repository: ${{ github.event.repository.full_name }}
           ref: ${{ github.head_ref }}
           token: ${{ secrets.WORKFLOW_PAT }}
 
+      - name: 📤 Set output
+        id: check-output
+        if: always()
+        run: echo "has-permissions=${{ steps.secrets-check.outcome == 'success' && 'true' || 'false' }}" >> $GITHUB_OUTPUT
+
   prechecks:
     name: Pre-checks
     runs-on: ubuntu-latest
     needs: permissions-check
-    if: github.event_name == 'pull_request' && !cancelled()
+    if: github.event_name == 'pull_request' && !failure() && !cancelled()
     permissions:
       contents: write
 
@@ -51,7 +64,8 @@ jobs:
         with:
           repository: ${{ github.event.repository.full_name }}
           ref: ${{ github.head_ref }}
-          token: ${{ needs.permissions-check.result == 'failure' && github.token || secrets.WORKFLOW_PAT }}
+          token: ${{ needs.permissions-check.outputs.has-permissions == 'false' && github.token || secrets.WORKFLOW_PAT }}
+          fetch-depth: ${{ github.event_name == 'push' && 2 || 1 }}
 
       - name: 📥 Install pnpm
         uses: pnpm/action-setup@v2
@@ -77,34 +91,62 @@ jobs:
           fi
 
       - name: ❌ Exit if lock file is not updated
-        if: needs.permissions-check.result == 'failure' && steps.detect-changes-pnpm.outputs.changes_detected == 'true'
+        if: needs.permissions-check.outputs.has-permissions == 'false' && steps.detect-changes-pnpm.outputs.changes_detected == 'true'
         run: exit 1
 
       - name: 📤 Commit updated lock file
         id: auto-commit-action-lock
-        if: needs.permissions-check.result != 'failure'
+        if: needs.permissions-check.outputs.has-permissions == 'true'
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: Update lock file
           file_pattern: pnpm-lock.yaml
 
       - name: ❌ Exit if lock file has been committed
-        if: needs.permissions-check.result != 'failure' && steps.auto-commit-action-lock.outputs.changes_detected == 'true'
+        if: needs.permissions-check.outputs.has-permissions == 'true' && steps.auto-commit-action-lock.outputs.changes_detected == 'true'
         run: exit 1
 
+      - name: 🔍 Get modified files
+        id: modified-files
+        uses: tj-actions/changed-files@v40
+
+      - name: 📤 Export results
+        id: changed-files
+        run: |
+          code_changes=false
+          config_changes=false
+
+          for file in ${{ steps.modified-files.outputs.all_changed_files }}; do
+            if [[ $file =~ ^src/ || $file =~ ^static/ ]]; then
+              echo "$file changes code"
+              code_changes=true
+            elif [[ $file = *.config.*s || $file = tsconfig.json ]]; then
+              echo "$file changes config"
+              config_changes=true
+            fi
+            if [[ $code_changes == 'true' && $config_changes == 'true' ]]; then
+              echo "Code and config changes detected, skipping further checks"
+              break
+            fi
+          done
+
+          echo "code_changes=$code_changes" >> $GITHUB_OUTPUT
+          echo "config_changes=$config_changes" >> $GITHUB_OUTPUT
+
       - name: ✨ Check Svelte format
+        if: steps.changed-files.outputs.code_changes == 'true'
         run: pnpm check
 
       - name: ✨ Check style with Prettier & ESLint
-        id: lint-check
+        if: steps.changed-files.outputs.code_changes == 'true' || steps.changed-files.outputs.config_changes == 'true'
         run: pnpm lint
 
       - name: 🔧 Fix lint
-        if: failure() && needs.permissions-check.result != 'failure'
+        if: failure() && needs.permissions-check.outputs.has-permissions == 'true'
         run: pnpm format
 
       - name: 📤 Commit lint fixes
-        if: failure() && needs.permissions-check.result != 'failure'
+        if: failure() && needs.permissions-check.outputs.has-permissions == 'true'
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: Fix lint
@@ -113,7 +155,9 @@ jobs:
     name: Build website
     runs-on: ubuntu-latest
     needs: prechecks
-    if: (!failure() && !cancelled()) || github.event_name == 'push'
+    if: (!failure() || github.event_name == 'push') && !cancelled()
+    outputs:
+      has-built: ${{ steps.changed-files.outputs.requires_build }}
 
     steps:
       - name: 📂 Checkout
@@ -121,20 +165,44 @@ jobs:
         with:
           repository: ${{ github.event.repository.full_name }}
           ref: ${{ github.head_ref }}
+          fetch-depth: ${{ github.event_name == 'push' && 2 || 1 }}
+
+      - name: 🔍 Get modified files
+        id: modified-files
+        uses: tj-actions/changed-files@v40
+
+      - name: 📤 Export results
+        id: changed-files
+        run: |
+          requires_build=false
+
+          for file in ${{ steps.modified-files.outputs.all_changed_files }}; do
+            if [[ $file =~ ^src/ || $file =~ ^static/ || $file = package.json || $file = pnpm-lock.yaml || $file = *.config.*s || $file = tsconfig.json ]]; then
+              echo "$file requires build"
+              requires_build=true
+              break
+            fi
+          done
+
+          echo "requires_build=$requires_build" >> $GITHUB_OUTPUT
 
       - name: 📥 Install pnpm
+        if: steps.changed-files.outputs.requires_build == 'true'
         uses: pnpm/action-setup@v2
         with:
           version: latest
 
       - name: 🧭 Setup Node
+        if: steps.changed-files.outputs.requires_build == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: latest
           cache: pnpm
 
       - name: 📥 Install NPM dependencies
+        if: steps.changed-files.outputs.requires_build == 'true'
         run: pnpm i # no need for `--no-frozen-lockfile` here, as the sync is ensured by the `prechecks` job
 
       - name: 🔨 Build repo
+        if: steps.changed-files.outputs.requires_build == 'true'
         run: pnpm build
