@@ -1,9 +1,6 @@
-#!/usr/bin/env sh
-. "$(dirname -- "$0")/_/husky.sh"
-
 if [ "$3" == 1 ]; then  # branch checkout only (not file checkout)
     # install dependencies
-    pnpm deps:install
+    pnpm install
     # remove local branches that have been deleted on remote
     git fetch -p
     pnpx git-removed-branches -p -f
