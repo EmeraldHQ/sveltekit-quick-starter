@@ -15,7 +15,7 @@
 		"lint": "prettier --check . && eslint .",
 		"format": "prettier --write .",
 		"ci:lint": "prettier --check ./src && eslint ./src",
-		"prepare": "husky install"
+		"prepare": "husky"
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-auto": "^3.0.0",
